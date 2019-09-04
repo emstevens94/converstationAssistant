@@ -43,9 +43,15 @@ while True:
             }
         }
     ).get_result()
-    
-    text = response['output']['generic'][0]['text']
-    print("Watson: " + text)
+    #print(json.dumps(response, indent=2))
+    generic = response['output']['generic']
+    if  len(generic) != 0:
+        text = response['output']['generic'][0]['text']
+        print("Watson: " + text)
+    else:
+        print("Watson: Bye!")
+        break
+
 
 
 # Delete assistant session
@@ -53,3 +59,5 @@ delete_info = service.delete_session(
     assistant_id=ASSISTANT_ID,
     session_id=session_info.get('session_id')
 ).get_result()
+
+#print(json.dumps(delete_info, indent=2))
