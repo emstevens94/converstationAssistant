@@ -21,7 +21,8 @@ response = service.message(
         'message_type': 'text',
         'text': '',
         'options': {
-            'restart': True
+            'restart': True,
+            'debug': True
         }
     }
 ).get_result()
@@ -39,18 +40,31 @@ while True:
             'message_type': 'text',
             'text': userinput,
             'options': {
-                'restart': False
+                'restart': False,
+                'debug' : True
             }
         }
     ).get_result()
-    #print(json.dumps(response, indent=2))
+    print(json.dumps(response, indent=2))
     generic = response['output']['generic']
-    if  len(generic) != 0:
-        text = response['output']['generic'][0]['text']
-        print("Watson: " + text)
+    
+    #Added debug to outputs to tell if we fall out of dialog tree hence exit branch
+    exitBranch = False
+    #Debug will have a length of atleast 3 or more when we exit in the demo tree
+    if len(response['output']['debug'])<3:
+        exitBranch = False
     else:
+        exitBranch = response['output']['debug']['branch_exited']
+    
+
+    if  exitBranch:
         print("Watson: Bye!")
         break
+
+    else:
+        text = response['output']['generic'][0]['text']
+        print("Watson: " + text)
+
 
 
 
