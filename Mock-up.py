@@ -43,6 +43,7 @@ while True:
             }
         }
     ).get_result()
+    
     text = response['output']['generic'][0]['text']
     print("Watson: " + text)
 
