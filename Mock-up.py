@@ -1,5 +1,11 @@
 import json
 import ibm_watson
+from ibm_watson import TextToSpeechV1
+
+import sounddevice as sd
+import soundfile as sf #Added to solve serial port error on playback
+from scipy.io.wavfile import write
+from os.path import join, dirname
 
 ASSISTANT_ID = 'c6f0a0ff-df7d-4f15-86aa-d2e1d579d60e'
 
@@ -7,6 +13,11 @@ service=ibm_watson.AssistantV2(
     iam_apikey='8MMYgg1QTkVV5fKvpGtN7ltohcGscem4WTHBN7PNdkf2',
     version='2019-02-28',
     url='https://gateway-wdc.watsonplatform.net/assistant/api'
+)
+
+text_to_speech = TextToSpeechV1(
+    iam_apikey= 'Cv_HnfQeONg9lZyjB5uUSNQaOoCCmTZKXUCmumRUws1a',
+    url = 'https://stream.watsonplatform.net/text-to-speech/api'
 )
 
 # Start assistant session
@@ -29,6 +40,21 @@ response = service.message(
 
 text = response['output']['generic'][0]['text']
 print("Watson: " + text)
+
+with open('translation.wav', 'wb') as audio_file:
+    audio_file.write(
+        text_to_speech.synthesize(
+            text,
+            voice='en-GB_KateVoice',
+            accept='audio/wav'        
+        ).get_result().content)
+
+#Takes the given file name, and opens it with the soundfile api to start a play back
+filename = 'translation.wav'
+# Extract data and sampling rate from file
+data, fs = sf.read(filename, dtype='float32')  
+sd.play(data, fs)
+status = sd.wait() 
 
 
 while True:
@@ -60,11 +86,39 @@ while True:
     if  exitBranch:
         text = response['output']['generic'][0]['text']
         print("Watson: " + text)
+        with open('translation.wav', 'wb') as audio_file:
+            audio_file.write(
+                text_to_speech.synthesize(
+                    text,
+                    voice='en-GB_KateVoice',
+                    accept='audio/wav'        
+                ).get_result().content)
+        
+        #Takes the given file name, and opens it with the soundfile api to start a play back
+        filename = 'translation.wav'
+        # Extract data and sampling rate from file
+        data, fs = sf.read(filename, dtype='float32')  
+        sd.play(data, fs)
+        status = sd.wait() 
         break
 
     else:
         text = response['output']['generic'][0]['text']
         print("Watson: " + text)
+        with open('translation.wav', 'wb') as audio_file:
+            audio_file.write(
+                text_to_speech.synthesize(
+                    text,
+                    voice='en-GB_KateVoice',
+                    accept='audio/wav'        
+                ).get_result().content)
+
+        #Takes the given file name, and opens it with the soundfile api to start a play back
+        filename = 'translation.wav'
+        # Extract data and sampling rate from file
+        data, fs = sf.read(filename, dtype='float32')  
+        sd.play(data, fs)
+        status = sd.wait() 
 
 
 
