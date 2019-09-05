@@ -45,7 +45,7 @@ while True:
             }
         }
     ).get_result()
-    print(json.dumps(response, indent=2))
+    #print(json.dumps(response, indent=2))
     generic = response['output']['generic']
     
     #Added debug to outputs to tell if we fall out of dialog tree hence exit branch
@@ -58,7 +58,8 @@ while True:
     
 
     if  exitBranch:
-        print("Watson: Bye!")
+        text = response['output']['generic'][0]['text']
+        print("Watson: " + text)
         break
 
     else:
