@@ -2,6 +2,9 @@ import React from 'react';
 import logo from './logo.svg';
 import './App.css';
 import moment from 'moment-timezone';
+import awsmobile from './aws-exports';
+
+var AWS = require('aws-sdk');
 
 function DisplayConversationHistory(props) {
   var conversationTree = props.dialogHistory.map(function(dialog) {
@@ -49,12 +52,48 @@ class App extends React.Component {
     if (this.state.userInput !== '') {
       var dialogTree = this.state.dialogHistory;
       dialogTree.push({text: this.state.userInput, time: moment().format('MMMM Do YYYY, h:mm:ss a'), user: true});
-      this.setState( {dialogHistory: dialogTree, userInput: ''} );
-      var textbox = document.getElementById('userInput');
-      textbox.value = '';
+
+      console.log(this.state.userInput);
+      var params = {userInput: this.state.userInput};
+
+      //var endpoint = "https://d0jddvy321.execute-api.us-east-2.amazonaws.com/initialCommunicator/conversationassistantcommunicator";
+
+      var lambda = new AWS.Lambda({region: 'us-east-2', accessKeyId: awsmobile.user_key, secretAccessKey: awsmobile.secred_key});
+
+      const systemResponse = (params) => { 
+         return lambda.invoke({
+          FunctionName: 'conversationAssistant',
+          Payload: JSON.stringify(params)
+        }).promise();
+      };
+
+      systemResponse(params).then(data => this.handleSystemResponse(data.Payload, dialogTree)).catch(err => console.log("Error getting lambda response: ", err));
+
+    // const sendUserInput = {
+    //   method: 'POST',
+    //   body: JSON.stringify(params),
+    //   headers: {
+    //     'Content-Type': 'application/json'
+    //   },
+    //   mode: 'cors'
+    // };
+
+    //   fetch(endpoint, sendUserInput).then(response => console.log("Response from lambda: ", response)).catch(err => console.log("Error sending data to lambda: ", err));
+
+    //   this.setState( {dialogHistory: dialogTree, userInput: ''} );
+    //   var textbox = document.getElementById('userInput');
+    //   textbox.value = '';
     } else {
       alert("No Text Detected");
     }
+  }
+
+  handleSystemResponse(payload, dialogTree) {
+    var payloadObject = JSON.parse(payload);
+    console.log(payloadObject);
+    console.log(payloadObject.body);
+    dialogTree.push({text: payloadObject.body, time: moment().format('MMMM Do YYYY, h:mm:ss a'), user: false});
+    this.setState({dialogHistory: dialogTree});
   }
 
   getTextInputForm() {
