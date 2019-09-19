@@ -6,7 +6,7 @@ body {
 
 .container {
   border: 2px solid #dedede;
-  background-color: #f1f1f1;
+  background-color: #32cd32;
   border-radius: 5px;
   padding: 10px;
   margin: 10px 0;
@@ -16,6 +16,18 @@ body {
   border-color: #ccc;
   background-color: #ddd;
   text-align: right;
+}
+
+.suggestion {
+  border-color: #ccc;
+  text-align: center;
+  background-color: #daa520
+}
+
+.exitBox {
+  background-color: #ff2400;
+  border-color: #ccc;
+  text-align: center;
 }
 
 .container::after {
