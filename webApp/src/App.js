@@ -3,10 +3,14 @@ import logo from './logo.svg';
 import './App.css';
 import moment from 'moment-timezone';
 import awsmobile from './aws-exports';
+import {getTestOpeningText} from './bob.js';
+
+// TODO user emotionList as the dictionary variable name for score
 
 var AWS = require('aws-sdk');
 
-var lambda = new AWS.Lambda({region: 'us-east-2', accessKeyId: awsmobile.user_key, secretAccessKey: awsmobile.secred_key});
+var lambda = new AWS.Lambda({region: 'us-east-2', accessKeyId: awsmobile.user_key, secretAccessKey: awsmobile.secret_key});
+//var lambda = null;
 
 function DisplayConversationHistory(props) {
   var conversationTree = props.dialogHistory.map(function(dialog) {
@@ -43,22 +47,37 @@ class App extends React.Component {
     this.state = {
       dialogHistory: [],
       userInput: '',
+      userInputHistory: [],
       sessionId: null
     }
     this.handleNewUserInput = this.handleNewUserInput.bind(this);
     this.changeText = this.changeText.bind(this);
 
-    var params = {sessionId: this.state.sessionId};
+  // var endpoint = "https://d0jddvy321.execute-api.us-east-2.amazonaws.com/initialCommunicator/returnTest";
+  // fetch(endpoint, params).then(response => console.log(response)).catch(err => console.log("Error sending data to lambda: ", err));
 
-    const systemResponse = (params) => { 
-      return lambda.invoke({
-       FunctionName: 'conversationAssistant',
-       Payload: JSON.stringify(params)
-     }).promise();
-   };
+  }
 
-   systemResponse(params).then(data => this.handleSystemResponse(data.Payload, this.state.dialogHistory)).catch(err => console.log("Error getting lambda response: ", err));
+  componentDidMount() {
+    if (!this.props.test) {
+      var params = {sessionId: this.state.sessionId};
+      const systemResponse = (params) => { 
+        return lambda.invoke({
+          FunctionName: 'conversationAssistant',
+          Payload: JSON.stringify(params)
+        }).promise();
+      };
+      
+    //console.log(testOpeningText);
+      systemResponse(params).then(data => this.handleSystemResponse(data.Payload, this.state.dialogHistory)).catch(err => console.log("Error getting lambda response: ", err));
+    } else {
+      // This happens when running in test mode
+      var testOpeningText = getTestOpeningText;
+      var history = this.state.dialogHistory.slice();
+      history.push(testOpeningText);
+      this.setState({sessionId: 1234, dialogHistory: history});
 
+    }
   }
 
   changeText(event) {
@@ -66,26 +85,32 @@ class App extends React.Component {
   }
 
   handleNewUserInput(event) {
+    console.log("Event: ", event);
     event.preventDefault();
 
     if (this.state.userInput !== '') {
       var dialogTree = this.state.dialogHistory;
       dialogTree.push({text: "You: " + this.state.userInput, time: moment().format('MMMM Do YYYY, h:mm:ss a'), type: "user"});
-      this.setState( {dialogHistory: dialogTree, userInput: ''} );
+      var userInputTree = this.state.userInputHistory.slice();
+      userInputTree.push(this.state.userInput);
+      this.setState( {dialogHistory: dialogTree, userInput: '', userInputHistory: userInputTree} );
 
       console.log(this.state.userInput);
       var params = {userInput: this.state.userInput, sessionId: this.state.sessionId};
 
-      //var endpoint = "https://d0jddvy321.execute-api.us-east-2.amazonaws.com/initialCommunicator/conversationassistantcommunicator";
+      // var endpoint = "https://d0jddvy321.execute-api.us-east-2.amazonaws.com/initialCommunicator/returnTest";
 
-      const systemResponse = (params) => { 
-         return lambda.invoke({
-          FunctionName: 'conversationAssistant',
-          Payload: JSON.stringify(params)
-        }).promise();
-      };
+      if (!this.props.test) {
+        const systemResponse = (params) => { 
+          return lambda.invoke({
+            FunctionName: 'conversationAssistant',
+            Payload: JSON.stringify(params)
+          }).promise();
+        };
+        
+        systemResponse(params).then(data => this.handleSystemResponse(data.Payload, dialogTree)).catch(err => console.log("Error getting lambda response: ", err));
+      }
 
-      systemResponse(params).then(data => this.handleSystemResponse(data.Payload, dialogTree)).catch(err => console.log("Error getting lambda response: ", err));
 
     // const sendUserInput = {
     //   method: 'POST',
@@ -96,9 +121,9 @@ class App extends React.Component {
     //   mode: 'cors'
     // };
 
-    //   fetch(endpoint, sendUserInput).then(response => console.log("Response from lambda: ", response)).catch(err => console.log("Error sending data to lambda: ", err));
+    //   fetch(endpoint, sendUserInput).then(response => this.handleSystemResponse(response.Payload, dialogTree)).catch(err => console.log("Error sending data to lambda: ", err));
 
-      this.setState( {dialogHistory: dialogTree, userInput: ''} );
+      // this.setState( {dialogHistory: dialogTree, userInput: ''} );
       var textbox = document.getElementById('userInput');
       textbox.value = '';
     } else {
@@ -121,6 +146,8 @@ class App extends React.Component {
         message += element.text + " ";
       });
       dialogTree.push({text: "Watson: " + message, time: moment().format('MMMM Do YYYY, h:mm:ss a'), type: "watson"});
+      //var testOpeningText = getTestOpeningText;
+      //dialogTree.push(testOpeningText);
       
 
       if (watsonResponse.output.intents.length !== 0) {
@@ -160,6 +187,54 @@ class App extends React.Component {
     }
   }
 
+  goBack() {
+    // TODO send id to lambda function to go back a node in the conversation tree
+    // Send the session id and a buffer of all text that has been sent from the user already, then
+    // delete the last input the user sent to watson.
+    console.log("Session ID: " + this.state.sessionId + " is going back in the conversation tree");
+
+    var userHistory = this.state.userInputHistory.slice();
+    var totalHistory = this.state.dialogHistory.slice();
+    userHistory.pop();
+    totalHistory.pop();
+    totalHistory.pop();
+    totalHistory.pop();
+
+    console.log('history list: ', userHistory);
+    console.log('sessionId:', this.state.sessionId);
+
+    var params = {sessionId: this.state.sessionId, history: userHistory};
+
+    this.setState({userInputHistory: userHistory, dialogHistory: totalHistory, sessionId: null});
+
+    if (!this.props.test) {
+      const systemResponse = (params) => { 
+        return lambda.invoke({
+          FunctionName: 'GoBack',
+          Payload: JSON.stringify(params)
+        }).promise();
+      };
+      
+      systemResponse(params).then(data => this.goBackResponse(data.Payload)).catch(err => console.log("Error getting lambda response: ", err));
+    }
+  }
+
+  goBackResponse(payload) {
+    var payloadObject = JSON.parse(payload);
+    console.log(payloadObject);
+
+    var sessionId = payloadObject.sessionId;
+    this.setState({sessionId: sessionId});
+  }
+
+  checkUserInput() {
+    // TODO send user input text to lambda function for intent analysis
+    console.log("Checking intent of user input: " + this.state.userInput);
+  }
+
+  // Check Text: pass string text inside the textbox
+  // Go Back: pass the session id
+  // Restart conversation loop: pass the session id
   getTextInputForm() {
     return (
       <form onSubmit={this.handleNewUserInput}>
@@ -167,7 +242,9 @@ class App extends React.Component {
           <input type="text" class="form-control" id="userInput" placeholder="Enter Text Here" name="input" onChange={this.changeText}/>
         </div>
         <div>
-          <input class="btn btn-success" type="submit" value="Send"/>
+          <input class="btn btn-success" type="submit" value="Send" id="send"/>
+          <input class="btn btn-primary" type="button" value="Check Text" id="check" onClick={() => this.checkUserInput()}/>
+          <input class="btn btn-warning" type="button" value="Go Back" id="back" onClick={() => this.goBack()}/>
         </div>
       </form>
     );
