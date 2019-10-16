@@ -29,8 +29,13 @@ it('initial state setup', () => {
   expect(wrapper.state().sessionId).toEqual(null);
 });
 
-it('test change text method', () => {
-  const wrapper = shallow(<App test={true}/>);
-  expect(wrapper.state().userInput).toEqual("test");
+// it('test change text method', () => {
+//   const wrapper = shallow(<App test={true}/>);
+//   expect(wrapper.state().userInput).toEqual("test");
 
-});
+// });
+
+// it('test check text functionality', () => {
+//   const wrapper = mount(<App test={true}/>, {disableLifecycleMethods: true});
+//   wrapper.
+// })

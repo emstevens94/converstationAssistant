@@ -3,9 +3,10 @@ import logo from './logo.svg';
 import './App.css';
 import moment from 'moment-timezone';
 import awsmobile from './aws-exports';
-import {getTestOpeningText} from './bob.js';
+import {getTestOpeningText, getTestSuggestionText} from './bob.js';
 
 // TODO user emotionList as the dictionary variable name for score
+// Color code intention responses TODO
 
 var AWS = require('aws-sdk');
 
@@ -48,7 +49,8 @@ class App extends React.Component {
       dialogHistory: [],
       userInput: '',
       userInputHistory: [],
-      sessionId: null
+      sessionId: null,
+      intentsList: []
     }
     this.handleNewUserInput = this.handleNewUserInput.bind(this);
     this.changeText = this.changeText.bind(this);
@@ -107,7 +109,7 @@ class App extends React.Component {
             Payload: JSON.stringify(params)
           }).promise();
         };
-        
+        console.log("sending these params: ", params);
         systemResponse(params).then(data => this.handleSystemResponse(data.Payload, dialogTree)).catch(err => console.log("Error getting lambda response: ", err));
       }
 
@@ -149,6 +151,7 @@ class App extends React.Component {
       //var testOpeningText = getTestOpeningText;
       //dialogTree.push(testOpeningText);
       
+      var intentHistory = this.state.intentsList.slice();
 
       if (watsonResponse.output.intents.length !== 0) {
         var intent = watsonResponse.output.intents[0].intent;
@@ -169,21 +172,50 @@ class App extends React.Component {
           case ("Dismissive"):
             intentMessage += "DISMISSIVE.";
             break;
+          case ("NoMore"):
+            intentMessage += "No more plans";
+            break;
           default:
             intentMessage += "Not Recognized."
 
         }
         dialogTree.push({text: intentMessage, time: null, type: "suggestion"});
+        
+        intentHistory.push(intent);
       }
 
       if (typeof watsonResponse.output.debug.branch_exited !== "undefined") {
-        dialogTree.push({text: "Conversation Ended.  Send any message to restart conversation.", time: null, type: "exit"});
+        console.log("calling get score");
+        this.getScore(intentHistory, dialogTree);
+        intentHistory = [];
         sessionId = null;
       }
 
-      this.setState({dialogHistory: dialogTree, sessionId: sessionId});
+
+      this.setState({dialogHistory: dialogTree, sessionId: sessionId, intentsList: intentHistory});
     } else {
       console.log("No text response from watson");
+    }
+  }
+
+  getScore(historyList, dialogTree) {
+    var params = {emotionList: historyList};
+    if (!this.props.test) {
+      console.log("sending these params", params);
+      const systemResponse = (params) => { 
+        return lambda.invoke({
+          FunctionName: 'score',
+          Payload: JSON.stringify(params)
+        }).promise();
+      };
+      
+      systemResponse(params).then(data => {
+        console.log("got this response from score: ", data);
+        var payload = JSON.parse(data.Payload);
+        var score = payload.score;
+        dialogTree.push({text: "Your score was: " + score + "\nConversation Ended.  Send any message to restart conversation.", time: null, type: "exit"});
+        this.setState({dialogHistory: dialogTree})
+      }).catch(err => console.log("Error getting lambda response: ", err));
     }
   }
 
@@ -195,17 +227,33 @@ class App extends React.Component {
 
     var userHistory = this.state.userInputHistory.slice();
     var totalHistory = this.state.dialogHistory.slice();
-    userHistory.pop();
-    totalHistory.pop();
-    totalHistory.pop();
-    totalHistory.pop();
+    var intentHistory = this.state.intentsList.slice();
+
+    if (totalHistory.length !== 1 && this.state.sessionId !== null) {
+      userHistory.pop();
+      // totalHistory.pop();
+      // totalHistory.pop();
+      // totalHistory.pop();
+      while (totalHistory[totalHistory.length - 1].type !== "user") {
+        totalHistory.pop();
+      }
+      totalHistory.pop();
+      intentHistory.pop();
+    } else {
+      console.log("Cannot go back anymore.  Already at the beginning of the conversation.");
+      if (totalHistory.length !== 1) {
+        alert("Already at the beginning of the conversation.");
+      } else {
+        alert("Already finished the covnersation.");
+      }
+    }
 
     console.log('history list: ', userHistory);
     console.log('sessionId:', this.state.sessionId);
 
     var params = {sessionId: this.state.sessionId, history: userHistory};
 
-    this.setState({userInputHistory: userHistory, dialogHistory: totalHistory, sessionId: null});
+    this.setState({userInputHistory: userHistory, dialogHistory: totalHistory, sessionId: null, intentsList: intentHistory});
 
     if (!this.props.test) {
       const systemResponse = (params) => { 
@@ -224,12 +272,41 @@ class App extends React.Component {
     console.log(payloadObject);
 
     var sessionId = payloadObject.sessionId;
+    console.log("setting new sessionID: ", sessionId);
+    this.state.sessionId = sessionId;
     this.setState({sessionId: sessionId});
   }
 
   checkUserInput() {
     // TODO send user input text to lambda function for intent analysis
     console.log("Checking intent of user input: " + this.state.userInput);
+    if (this.state.userInput !== "") {
+      var params = {userInput: this.state.userInput};
+      if (!this.props.test) {
+        const systemResponse = (params) => { 
+          return lambda.invoke({
+            FunctionName: 'tone',
+            Payload: JSON.stringify(params)
+          }).promise();
+        };
+        
+        systemResponse(params).then(data => this.checkInputResponse(data.Payload)).catch(err => console.log("Error getting lambda response: ", err));
+      } else {
+        this.checkInputResponse(getTestSuggestionText);
+      }
+    } else {
+      alert("Enter user input before checking it's intent.");
+    }
+  }
+
+  checkInputResponse(payload) {
+    var payloadObject = JSON.parse(payload);
+    console.log("check input response: ", payloadObject);
+
+    var suggestion = payloadObject.intent;
+    var totalHistory = this.state.dialogHistory.slice();
+    totalHistory.push({text: "Watson detected that your current intent will be: " + suggestion, time: moment().format('MMMM Do YYYY, h:mm:ss a'), type: "suggestion"})
+    this.setState({dialogHistory: totalHistory});
   }
 
   // Check Text: pass string text inside the textbox
